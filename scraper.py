@@ -1,24 +1,52 @@
-# This is a template for a Python scraper on morph.io (https://morph.io)
-# including some code snippets below that you should find helpful
+# coding=utf-8
 
-# import scraperwiki
-# import lxml.html
-#
-# # Read in a page
-# html = scraperwiki.scrape("http://foo.com")
-#
-# # Find something on the page using css selectors
-# root = lxml.html.fromstring(html)
-# root.cssselect("div[align='left']")
-#
-# # Write out to the sqlite database using scraperwiki library
-# scraperwiki.sqlite.save(unique_keys=['name'], data={"name": "susan", "occupation": "software developer"})
-#
-# # An arbitrary query against the database
-# scraperwiki.sql.select("* from data where 'name'='peter'")
+import scraperwiki
+import lxml.etree
+import sqlite3
 
-# You don't have to do things with the ScraperWiki and lxml libraries.
-# You can use whatever libraries you want: https://morph.io/documentation/python
-# All that matters is that your final data is written to an SQLite database
-# called "data.sqlite" in the current working directory which has at least a table
-# called "data".
+BASE_URL = 'https://parlamentaria.legislatura.gov.ar/webservices/Json.asmx/GetDiputadosActivosNuevo?id_bloque='
+
+xml = scraperwiki.scrape(BASE_URL)
+
+root = lxml.etree.fromstring(xml)
+
+print root
+
+parsedMembers = []
+
+for member in root:
+
+    memberData = {}
+
+    memberData['id'] = member.find('{http://tempuri.org/}id_legislador').text
+
+    memberData['first_name'] = member.find('{http://tempuri.org/}nombre').text
+
+    memberData['last_name'] = member.find('{http://tempuri.org/}apellido').text
+
+    memberData['name'] = u'{} {}'.format(memberData['first_name'], memberData['last_name'])
+
+    memberData['party'] = member.find('{http://tempuri.org/}bloque').text
+
+    memberData['image'] = member.find('{http://tempuri.org/}foto').text
+
+    gender = member.find('{http://tempuri.org/}id_sexo').text
+
+    if gender == '1':
+        memberData['gender'] = 'male'
+    elif gender == '2':
+        memberData['gender'] = 'female'
+
+    print memberData
+
+    parsedMembers.append(memberData)
+
+print 'Counted {} Members'.format(len(parsedMembers))
+
+try:
+    scraperwiki.sqlite.execute('DELETE FROM data')
+except sqlite3.OperationalError:
+    pass
+scraperwiki.sqlite.save(
+    unique_keys=['id'],
+    data=parsedMembers)
